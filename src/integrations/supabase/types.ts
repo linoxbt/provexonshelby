@@ -14,7 +14,271 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attestations: {
+        Row: {
+          aptos_tx_hash: string | null
+          blob_id: string
+          created_at: string
+          id: string
+          message: string
+          public_key: string
+          signature: string
+          status: string
+          unverified_reason: string | null
+          uploader: string
+        }
+        Insert: {
+          aptos_tx_hash?: string | null
+          blob_id: string
+          created_at?: string
+          id?: string
+          message: string
+          public_key: string
+          signature: string
+          status?: string
+          unverified_reason?: string | null
+          uploader: string
+        }
+        Update: {
+          aptos_tx_hash?: string | null
+          blob_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          public_key?: string
+          signature?: string
+          status?: string
+          unverified_reason?: string | null
+          uploader?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attestations_blob_id_fkey"
+            columns: ["blob_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["blob_id"]
+          },
+        ]
+      }
+      datasets: {
+        Row: {
+          blob_id: string
+          created_at: string
+          file_name: string
+          id: string
+          license: string | null
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          uploader: string
+        }
+        Insert: {
+          blob_id: string
+          created_at?: string
+          file_name: string
+          id?: string
+          license?: string | null
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          uploader: string
+        }
+        Update: {
+          blob_id?: string
+          created_at?: string
+          file_name?: string
+          id?: string
+          license?: string | null
+          mime_type?: string
+          size_bytes?: number
+          storage_path?: string
+          uploader?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "datasets_uploader_fkey"
+            columns: ["uploader"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["address"]
+          },
+        ]
+      }
+      dev_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          owner: string
+          revoked_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          owner: string
+          revoked_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          owner?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dev_keys_owner_fkey"
+            columns: ["owner"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["address"]
+          },
+        ]
+      }
+      lineage: {
+        Row: {
+          child_blob_id: string
+          created_at: string
+          id: string
+          parent_blob_id: string
+        }
+        Insert: {
+          child_blob_id: string
+          created_at?: string
+          id?: string
+          parent_blob_id: string
+        }
+        Update: {
+          child_blob_id?: string
+          created_at?: string
+          id?: string
+          parent_blob_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lineage_child_blob_id_fkey"
+            columns: ["child_blob_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["blob_id"]
+          },
+          {
+            foreignKeyName: "lineage_parent_blob_id_fkey"
+            columns: ["parent_blob_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["blob_id"]
+          },
+        ]
+      }
+      ticker_events: {
+        Row: {
+          blob_id: string
+          created_at: string
+          event_type: string
+          id: number
+          uploader: string
+        }
+        Insert: {
+          blob_id: string
+          created_at?: string
+          event_type?: string
+          id?: number
+          uploader: string
+        }
+        Update: {
+          blob_id?: string
+          created_at?: string
+          event_type?: string
+          id?: number
+          uploader?: string
+        }
+        Relationships: []
+      }
+      verified_models: {
+        Row: {
+          created_at: string
+          description: string | null
+          developer: string
+          id: string
+          name: string
+          training_corpus_blob_id: string | null
+          weights_blob_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          developer: string
+          id?: string
+          name: string
+          training_corpus_blob_id?: string | null
+          weights_blob_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          developer?: string
+          id?: string
+          name?: string
+          training_corpus_blob_id?: string | null
+          weights_blob_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verified_models_developer_fkey"
+            columns: ["developer"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["address"]
+          },
+          {
+            foreignKeyName: "verified_models_training_corpus_blob_id_fkey"
+            columns: ["training_corpus_blob_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["blob_id"]
+          },
+          {
+            foreignKeyName: "verified_models_weights_blob_id_fkey"
+            columns: ["weights_blob_id"]
+            isOneToOne: false
+            referencedRelation: "datasets"
+            referencedColumns: ["blob_id"]
+          },
+        ]
+      }
+      wallets: {
+        Row: {
+          address: string
+          display_name: string | null
+          first_seen_at: string
+          last_seen_at: string
+        }
+        Insert: {
+          address: string
+          display_name?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+        }
+        Update: {
+          address?: string
+          display_name?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
