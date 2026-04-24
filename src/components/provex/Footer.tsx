@@ -6,7 +6,7 @@ export const Footer = () => (
       <div className="space-y-2">
         <Logo />
         <p className="text-sm text-muted-foreground max-w-md">
-          The notary layer for Web3 data. Built on Shelby & Aptos.
+          The notary layer for Web3 data.
         </p>
       </div>
       <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
