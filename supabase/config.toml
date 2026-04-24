@@ -1,0 +1,16 @@
+project_id = "kqzyhadblzgklkxygmus"
+
+[functions.attest-upload]
+verify_jwt = false
+
+[functions.verify-blob]
+verify_jwt = false
+
+[functions.dev-keys]
+verify_jwt = false
+
+[functions.ticker-feed]
+verify_jwt = false
+
+[functions.register-model]
+verify_jwt = false

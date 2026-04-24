@@ -1,28 +1,64 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { PageShell } from "@/components/provex/PageShell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ShieldCheck, Download, ExternalLink, Clock, User } from "lucide-react";
+import { Search, ShieldCheck, ShieldAlert, Download, ExternalLink, Clock, User, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { downloadBlob, shortAddr, type Attestation, type Dataset } from "@/lib/provex";
+import { toast } from "sonner";
 
-const lineage = [
-  { id: "0x4a91…ee10", label: "raw-events.jsonl", x: 60, y: 140, root: true },
-  { id: "0x88aa…b231", label: "cleaned-v2.parquet", x: 280, y: 80 },
-  { id: "0xc002…ff19", label: "features-train.bin", x: 280, y: 200 },
-  { id: "0xb1f4…a92c", label: "training-corpus-v4", x: 520, y: 140, current: true },
-];
-
-const edges = [
-  ["0x4a91…ee10", "0x88aa…b231"],
-  ["0x4a91…ee10", "0xc002…ff19"],
-  ["0x88aa…b231", "0xb1f4…a92c"],
-  ["0xc002…ff19", "0xb1f4…a92c"],
-];
+type VerifyResult = {
+  status: "verified" | "unverified" | "pending";
+  reason: string | null;
+  dataset?: Dataset;
+  attestation?: Attestation;
+  lineage?: { parent_blob_id: string; child_blob_id: string }[];
+  blob_id?: string;
+};
 
 const Explorer = () => {
-  const [query, setQuery] = useState("0xb1f4a92c8e1d4a7b2c3f9e0a1b2c3d4e5f6a7b8c");
-  const [submitted, setSubmitted] = useState(true);
+  const { blobId: routeBlob } = useParams();
+  const navigate = useNavigate();
 
-  const node = (id: string) => lineage.find(n => n.id === id)!;
+  const [query, setQuery] = useState(routeBlob ?? "");
+  const [result, setResult] = useState<VerifyResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const verify = async (raw: string) => {
+    const id = raw.trim().toLowerCase().replace(/^0x/, "");
+    if (!id) return;
+    setLoading(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        `verify-blob?blob_id=${encodeURIComponent(id)}`,
+        { method: "GET" }
+      );
+      if (error) throw error;
+      setResult(data);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Verification failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (routeBlob) {
+      setQuery(routeBlob);
+      verify(routeBlob);
+    }
+  }, [routeBlob]);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = query.trim().toLowerCase().replace(/^0x/, "");
+    if (id) navigate(`/explorer/${id}`);
+  };
+
+  const verified = result?.status === "verified";
+  const unverified = result?.status === "unverified";
 
   return (
     <PageShell>
@@ -33,10 +69,7 @@ const Explorer = () => {
           Paste a Shelby Blob ID or Provex Attestation ID. We'll verify it against the Aptos chain in real time.
         </p>
 
-        <form
-          onSubmit={e => { e.preventDefault(); setSubmitted(true); }}
-          className="mt-8 glass-strong rounded-2xl p-2 flex items-center gap-2"
-        >
+        <form onSubmit={onSubmit} className="mt-8 glass-strong rounded-2xl p-2 flex items-center gap-2">
           <Search className="h-5 w-5 text-muted-foreground ml-3" />
           <Input
             value={query}
@@ -44,118 +77,152 @@ const Explorer = () => {
             placeholder="Shelby Blob ID or Provex Attestation ID…"
             className="border-0 bg-transparent font-mono text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
           />
-          <Button type="submit" className="bg-gradient-primary text-primary-foreground shadow-glow">Verify</Button>
+          <Button type="submit" disabled={loading} className="bg-gradient-primary text-primary-foreground shadow-glow">
+            {loading ? "Verifying…" : "Verify"}
+          </Button>
         </form>
 
-        {submitted && (
+        {result && (
           <div className="mt-10 grid lg:grid-cols-3 gap-5 animate-fade-up">
-            {/* Status */}
-            <div className="glass rounded-2xl p-7 lg:col-span-1 relative overflow-hidden">
-              <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-accent/20 blur-3xl" />
+            {/* Status panel */}
+            <div className={`glass rounded-2xl p-7 lg:col-span-1 relative overflow-hidden ${
+              unverified ? "ring-1 ring-destructive/40" : ""
+            }`}>
+              <div className={`absolute -top-16 -right-16 h-48 w-48 rounded-full blur-3xl ${
+                verified ? "bg-accent/20" : unverified ? "bg-destructive/25" : "bg-primary/15"
+              }`} />
               <div className="relative">
-                <div className="inline-flex items-center gap-2 rounded-full bg-accent/15 text-accent px-3 py-1.5 font-mono text-xs uppercase tracking-widest">
-                  <ShieldCheck className="h-4 w-4" /> Verified
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-mono text-xs uppercase tracking-widest ${
+                  verified ? "bg-accent/15 text-accent"
+                  : unverified ? "bg-destructive/15 text-destructive"
+                  : "bg-primary/15 text-primary"
+                }`}>
+                  {verified ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+                  {result.status}
                 </div>
-                <div className="mt-6 text-5xl font-semibold tracking-tight text-accent">VERIFIED</div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Attestation matches the on-chain Aptos record.
-                </p>
-                <div className="mt-6 space-y-3 text-sm">
-                  <div className="flex items-start gap-3">
-                    <User className="h-4 w-4 mt-0.5 text-primary" />
-                    <div>
-                      <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Uploader</div>
-                      <div className="font-mono text-xs">0xA1F3…9D2B</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Clock className="h-4 w-4 mt-0.5 text-primary" />
-                    <div>
-                      <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Timestamp</div>
-                      <div className="font-mono text-xs">2025-04-22 14:32:08 UTC</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <ExternalLink className="h-4 w-4 mt-0.5 text-primary" />
-                    <div>
-                      <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Aptos Tx</div>
-                      <div className="font-mono text-xs">0x91ec…44a8</div>
-                    </div>
-                  </div>
+                <div className={`mt-6 text-5xl font-semibold tracking-tight ${
+                  verified ? "text-accent" : unverified ? "text-destructive" : "text-primary"
+                }`}>
+                  {result.status.toUpperCase()}
                 </div>
-                <Button className="mt-7 w-full bg-gradient-primary text-primary-foreground shadow-glow">
-                  <Download className="h-4 w-4 mr-2" /> Download from Shelby
-                </Button>
+
+                {unverified && (
+                  <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+                    <div className="flex items-start gap-2 text-destructive">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="font-mono text-[11px] uppercase tracking-widest">Reason</div>
+                        <p className="text-sm mt-1 text-foreground/80">
+                          {result.reason ?? "Could not verify this BlobID."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {verified && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Attestation matches the on-chain Aptos record.
+                  </p>
+                )}
+
+                {result.dataset && (
+                  <div className="mt-6 space-y-3 text-sm">
+                    <div className="flex items-start gap-3">
+                      <User className="h-4 w-4 mt-0.5 text-primary" />
+                      <div>
+                        <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Uploader</div>
+                        <div className="font-mono text-xs">{shortAddr(result.dataset.uploader)}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Clock className="h-4 w-4 mt-0.5 text-primary" />
+                      <div>
+                        <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Timestamp</div>
+                        <div className="font-mono text-xs">{new Date(result.dataset.created_at).toUTCString()}</div>
+                      </div>
+                    </div>
+                    {result.attestation?.aptos_tx_hash && (
+                      <div className="flex items-start gap-3">
+                        <ExternalLink className="h-4 w-4 mt-0.5 text-primary" />
+                        <div>
+                          <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Aptos Tx</div>
+                          <div className="font-mono text-xs">{result.attestation.aptos_tx_hash.slice(0, 8)}…</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {result.dataset && (
+                  <Button
+                    onClick={() => downloadBlob(result.dataset!.storage_path, result.dataset!.file_name)}
+                    className="mt-7 w-full bg-gradient-primary text-primary-foreground shadow-glow"
+                  >
+                    <Download className="h-4 w-4 mr-2" /> Download from Shelby
+                  </Button>
+                )}
               </div>
             </div>
 
-            {/* Lineage */}
+            {/* Lineage / details panel */}
             <div className="glass rounded-2xl p-7 lg:col-span-2">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Data Lineage</h3>
                 <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                  4 ancestors · 2 generations
+                  {(result.lineage?.length ?? 0)} edges
                 </span>
               </div>
 
-              <div className="mt-6 relative w-full overflow-x-auto">
-                <svg viewBox="0 0 700 280" className="w-full min-w-[600px] h-[280px]">
-                  <defs>
-                    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.9" />
-                    </linearGradient>
-                  </defs>
-                  {edges.map(([a, b], i) => {
-                    const A = node(a), B = node(b);
-                    return (
-                      <path
-                        key={i}
-                        d={`M ${A.x + 60} ${A.y} C ${A.x + 160} ${A.y}, ${B.x - 100} ${B.y}, ${B.x - 60} ${B.y}`}
-                        stroke="url(#edge)"
-                        strokeWidth="1.5"
-                        fill="none"
-                      />
-                    );
-                  })}
-                  {lineage.map(n => (
-                    <g key={n.id} transform={`translate(${n.x - 60}, ${n.y - 28})`}>
-                      <rect
-                        width="120" height="56" rx="12"
-                        fill={n.current ? "hsl(var(--primary) / 0.18)" : "hsl(var(--card))"}
-                        stroke={n.current ? "hsl(var(--primary))" : "hsl(var(--border))"}
-                        strokeWidth={n.current ? 1.5 : 1}
-                      />
-                      {n.current && (
-                        <circle cx="110" cy="10" r="4" fill="hsl(var(--accent))">
-                          <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
-                        </circle>
-                      )}
-                      <text x="12" y="22" fill="hsl(var(--foreground))" fontSize="11" fontFamily="JetBrains Mono" fontWeight="600">
-                        {n.label.length > 16 ? n.label.slice(0, 15) + "…" : n.label}
-                      </text>
-                      <text x="12" y="40" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="JetBrains Mono">
-                        {n.id}
-                      </text>
-                    </g>
-                  ))}
-                </svg>
-              </div>
+              {result.dataset ? (
+                <>
+                  {!result.lineage?.length ? (
+                    <p className="mt-6 text-sm text-muted-foreground">
+                      No lineage recorded — this is a root dataset.
+                    </p>
+                  ) : (
+                    <ul className="mt-4 divide-y divide-border/60">
+                      {result.lineage.map((e, i) => (
+                        <li key={i} className="py-3 flex items-center justify-between gap-3 font-mono text-xs">
+                          <span className="text-muted-foreground">parent</span>
+                          <Link to={`/explorer/${e.parent_blob_id}`} className="text-primary hover:underline truncate">
+                            {e.parent_blob_id.slice(0, 12)}…{e.parent_blob_id.slice(-6)}
+                          </Link>
+                          <span className="opacity-50">→</span>
+                          <Link to={`/explorer/${e.child_blob_id}`} className="hover:underline truncate">
+                            {e.child_blob_id.slice(0, 12)}…{e.child_blob_id.slice(-6)}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
-              <div className="mt-6 grid sm:grid-cols-3 gap-3 font-mono text-xs">
-                <div className="rounded-lg border border-border/60 px-3 py-2">
-                  <div className="text-muted-foreground uppercase tracking-widest text-[10px]">Size</div>
-                  <div className="mt-1">2.41 GB</div>
+                  <div className="mt-6 grid sm:grid-cols-3 gap-3 font-mono text-xs">
+                    <div className="rounded-lg border border-border/60 px-3 py-2">
+                      <div className="text-muted-foreground uppercase tracking-widest text-[10px]">Size</div>
+                      <div className="mt-1">{(result.dataset.size_bytes / 1e6).toFixed(2)} MB</div>
+                    </div>
+                    <div className="rounded-lg border border-border/60 px-3 py-2">
+                      <div className="text-muted-foreground uppercase tracking-widest text-[10px]">MIME</div>
+                      <div className="mt-1 truncate">{result.dataset.mime_type}</div>
+                    </div>
+                    <div className="rounded-lg border border-border/60 px-3 py-2">
+                      <div className="text-muted-foreground uppercase tracking-widest text-[10px]">License</div>
+                      <div className="mt-1">{result.dataset.license}</div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-6 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+                  <ShieldAlert className="h-8 w-8 text-destructive mx-auto" />
+                  <p className="mt-3 text-sm">
+                    No record found for BlobID <span className="font-mono">{result.blob_id?.slice(0, 12)}…</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This file was never registered on Provex. It cannot be considered authentic.
+                  </p>
                 </div>
-                <div className="rounded-lg border border-border/60 px-3 py-2">
-                  <div className="text-muted-foreground uppercase tracking-widest text-[10px]">MIME</div>
-                  <div className="mt-1">application/parquet</div>
-                </div>
-                <div className="rounded-lg border border-border/60 px-3 py-2">
-                  <div className="text-muted-foreground uppercase tracking-widest text-[10px]">License</div>
-                  <div className="mt-1">CC-BY-SA-4.0</div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}

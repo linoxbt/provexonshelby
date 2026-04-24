@@ -1,39 +1,74 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/provex/PageShell";
 import { ArrowRight, FileSignature, Database, ShieldCheck, Lock, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { shortAddr, shortBlob } from "@/lib/provex";
 
-const ticker = [
-  { id: "0xb1f4…a92c", who: "0xA1…F3", t: "2s ago" },
-  { id: "0x77ec…01dd", who: "0x9C…4B", t: "11s ago" },
-  { id: "0x4a91…ee10", who: "did:apt:0x12…", t: "23s ago" },
-  { id: "0xc002…ff19", who: "0x38…9A", t: "47s ago" },
-  { id: "0x88aa…b231", who: "0xE7…2D", t: "1m ago" },
-  { id: "0x12cd…7704", who: "did:apt:0xab…", t: "1m ago" },
-  { id: "0x55be…aa9c", who: "0x44…71", t: "2m ago" },
-  { id: "0x9eef…3320", who: "0x66…8E", t: "2m ago" },
-];
+type TickerEvent = { id: number; blob_id: string; uploader: string; created_at: string };
+
+const timeAgo = (iso: string) => {
+  const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+};
 
 const Index = () => {
-  const items = [...ticker, ...ticker];
+  const [events, setEvents] = useState<TickerEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Initial fetch with pagination fallback
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data } = await supabase.functions.invoke("ticker-feed", {
+        method: "GET",
+      });
+      if (!alive) return;
+      setEvents(data?.events ?? []);
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Realtime subscription to new attestations
+  useEffect(() => {
+    const channel = supabase
+      .channel("ticker")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "ticker_events" },
+        (payload) => {
+          setEvents((prev) => [payload.new as TickerEvent, ...prev].slice(0, 40));
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  const display = events.length > 0
+    ? [...events, ...events]
+    : []; // empty = show placeholder below
+
   return (
     <PageShell>
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-hero pointer-events-none" />
         <div className="container relative pt-24 pb-28 md:pt-32 md:pb-36">
           <div className="max-w-3xl animate-fade-up">
             <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/40 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-accent pulse-dot" />
-              Built on Shelby · Anchored to Aptos
+              The notary layer for Web3 data
             </div>
             <h1 className="mt-6 text-5xl md:text-7xl font-semibold leading-[1.02] tracking-tight">
               Verifiable Data <br /> Provenance on <span className="text-gradient">Shelby</span>.
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl">
-              If Shelby is the hard drive, Provex is the notary. Sign your data, store it on Shelby,
-              and prove its origin on Aptos — forever.
+              Sign your data, store it on Shelby, and prove its origin on Aptos — forever.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-90">
@@ -59,18 +94,30 @@ const Index = () => {
               Live · Verified Uploads
             </div>
             <div className="overflow-hidden flex-1 [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]">
-              <div className="marquee font-mono text-xs">
-                {items.map((it, i) => (
-                  <div key={i} className="flex items-center gap-3 text-muted-foreground">
-                    <ShieldCheck className="h-3.5 w-3.5 text-accent" />
-                    <span className="text-foreground">{it.id}</span>
-                    <span className="opacity-50">·</span>
-                    <span>{it.who}</span>
-                    <span className="opacity-50">·</span>
-                    <span className="opacity-70">{it.t}</span>
-                  </div>
-                ))}
-              </div>
+              {loading ? (
+                <div className="font-mono text-xs text-muted-foreground">Connecting to feed…</div>
+              ) : display.length === 0 ? (
+                <div className="font-mono text-xs text-muted-foreground">
+                  No attestations yet. Be the first — <Link to="/app" className="text-primary underline">upload a file</Link>.
+                </div>
+              ) : (
+                <div className="marquee font-mono text-xs">
+                  {display.map((it, i) => (
+                    <Link
+                      key={`${it.id}-${i}`}
+                      to={`/explorer/${it.blob_id}`}
+                      className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5 text-accent" />
+                      <span className="text-foreground">{shortBlob(it.blob_id)}</span>
+                      <span className="opacity-50">·</span>
+                      <span>{shortAddr(it.uploader)}</span>
+                      <span className="opacity-50">·</span>
+                      <span className="opacity-70">{timeAgo(it.created_at)}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
