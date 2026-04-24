@@ -13,7 +13,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AptosWalletAdapterProvider
       autoConnect
-      optInWallets={["Petra", "Martian", "Pontem Wallet"]}
+      optInWallets={["Petra"]}
       dappConfig={{ network: Network.DEVNET, aptosConnectDappId: "provex" }}
       onError={(err) => {
         console.error("Wallet error", err);
