@@ -1,0 +1,12 @@
+[package]
+name = "provex"
+version = "0.1.0"
+authors = ["Provex Labs"]
+
+[addresses]
+provex = "_"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-framework.git"
+rev = "mainnet"
+subdir = "aptos-framework"
