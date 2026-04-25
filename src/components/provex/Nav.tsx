@@ -15,7 +15,7 @@ export const Nav = () => {
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/60 backdrop-blur-xl">
       <div className="container flex h-16 items-center justify-between gap-3">
-        <Link to="/" aria-label="Provex home"><Logo /></Link>
+        <Link to="/" aria-label="Provex home" className="shrink-0"><Logo /></Link>
         <nav className="hidden md:flex items-center gap-1 font-mono text-xs uppercase tracking-wider">
           {links.map(l => (
             <Link
