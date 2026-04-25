@@ -20,9 +20,9 @@ export const ConnectWallet = ({ size = "sm" as const }) => {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size={size} className="bg-gradient-primary text-primary-foreground shadow-glow">
-            <Wallet className="h-4 w-4 mr-1.5" />
-            Connect Wallet
+          <Button size={size} className="bg-gradient-primary text-primary-foreground shadow-glow shrink-0">
+            <Wallet className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Connect Wallet</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
