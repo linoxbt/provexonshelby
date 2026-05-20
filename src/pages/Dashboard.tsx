@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { sha256Hex, shortAddr, type Dataset } from "@/lib/provex";
 import { toast } from "sonner";
 import { ConnectWallet } from "@/components/provex/ConnectWallet";
+import { useAptosNetwork, REQUIRED_NETWORK } from "@/hooks/useAptosNetwork";
+import { Button as UIButton } from "@/components/ui/button";
 
 type Stage = "idle" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
 
@@ -25,6 +27,7 @@ const Stat = ({ label, value, icon: Icon, sub }: { label: string; value: string;
 const Dashboard = () => {
   const { connected, account, signMessage, signAndSubmitTransaction } = useWallet();
   const wallet = account?.address?.toString().toLowerCase() ?? null;
+  const { isCorrect: networkOk, switchToTestnet, current: currentNetwork } = useAptosNetwork();
 
   const [stage, setStage] = useState<Stage>("idle");
   const [progress, setProgress] = useState(0);
@@ -77,6 +80,10 @@ const Dashboard = () => {
   const handleFile = useCallback(async (file: File) => {
     if (!connected || !wallet || !signMessage) {
       toast.error("Connect your wallet first");
+      return;
+    }
+    if (!networkOk) {
+      toast.error(`Switch your wallet to Aptos ${REQUIRED_NETWORK} to upload`);
       return;
     }
     setError(null);
@@ -163,7 +170,7 @@ const Dashboard = () => {
       setStage("error");
       toast.error(e?.message ?? "Upload failed");
     }
-  }, [connected, wallet, signMessage, signAndSubmitTransaction, account, refresh]);
+  }, [connected, wallet, signMessage, signAndSubmitTransaction, account, refresh, networkOk]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -193,6 +200,16 @@ const Dashboard = () => {
           <Stat label="Attestations Signed" value={String(stats.attestations)} icon={FileCheck2} sub="100% verified" />
           <Stat label="Active Storage Providers" value="37" icon={Database} sub="Shelby network" />
         </div>
+
+        {connected && !networkOk && (
+          <div className="mt-6 rounded-xl border border-primary/40 bg-primary/10 p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm">
+              Wallet is on <span className="font-mono">{currentNetwork ?? "unknown"}</span>.
+              Provex requires <span className="font-mono">{REQUIRED_NETWORK}</span> for Shelby signing and uploads.
+            </div>
+            <UIButton size="sm" onClick={switchToTestnet}>Switch network</UIButton>
+          </div>
+        )}
 
         {/* Upload */}
         <div className="mt-8 grid lg:grid-cols-3 gap-4">
