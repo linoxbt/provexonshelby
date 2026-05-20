@@ -12,8 +12,6 @@ import ApiKeys from "./pages/ApiKeys.tsx";
 import DatasetDetail from "./pages/DatasetDetail.tsx";
 import Models from "./pages/Models.tsx";
 import Docs from "./pages/Docs.tsx";
-import Simulation from "./pages/Simulation.tsx";
-import Settings from "./pages/Settings.tsx";
 
 const queryClient = new QueryClient();
 
@@ -33,9 +31,6 @@ const App = () => (
             <Route path="/models" element={<Models />} />
             <Route path="/api" element={<ApiKeys />} />
             <Route path="/docs" element={<Docs />} />
-            <Route path="/simulation" element={<Simulation />} />
-            <Route path="/settings" element={<Settings />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
