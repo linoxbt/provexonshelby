@@ -11,7 +11,9 @@ import { ConnectWallet } from "@/components/provex/ConnectWallet";
 import { useAptosNetwork, REQUIRED_NETWORK } from "@/hooks/useAptosNetwork";
 import { Button as UIButton } from "@/components/ui/button";
 
-type Stage = "idle" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
+type Stage = "idle" | "fee" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
+
+const UPLOAD_FEE_SHELBY_USDT = 0.1;
 
 const Stat = ({ label, value, icon: Icon, sub }: { label: string; value: string; icon: any; sub?: string }) => (
   <div className="glass rounded-2xl p-6">
@@ -95,6 +97,17 @@ const Dashboard = () => {
       setStage("hashing");
       const bytes = new Uint8Array(await file.arrayBuffer());
       const blobId = await sha256Hex(bytes);
+
+      // 1b) Require explicit signed acknowledgement of the 0.1 ShelbyUSDT upload fee.
+      setStage("fee");
+      const feeMessage = `Provex upload fee\nAmount: ${UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT\nBlobID: ${blobId}\nUploader: ${wallet}\nAt: ${new Date().toISOString()}`;
+      try {
+        await signMessage({ message: feeMessage, nonce: `fee-${blobId.slice(0, 12)}` });
+      } catch (e: any) {
+        throw new Error(e?.message?.toLowerCase?.().includes("reject")
+          ? "Upload fee was declined in your wallet"
+          : (e?.message ?? "Fee signature failed"));
+      }
 
       // 2) Sign the canonical attestation message with the Aptos wallet.
       //    Same Ed25519 key signs Shelby commitments - wallet signs once.
@@ -255,13 +268,20 @@ const Dashboard = () => {
             {stage === "hashing" && (
               <div className="py-6 flex flex-col items-center gap-3">
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                <div className="font-mono text-sm">Hashing file → Shelby BlobID…</div>
+                <div className="font-mono text-sm">Hashing file to Shelby BlobID...</div>
+              </div>
+            )}
+            {stage === "fee" && (
+              <div className="py-6 flex flex-col items-center gap-3">
+                <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                <div className="font-mono text-sm">Confirm {UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT upload fee...</div>
+                <div className="text-xs text-muted-foreground">Approve the fee in your wallet to continue</div>
               </div>
             )}
             {stage === "signing" && (
               <div className="py-6 flex flex-col items-center gap-3">
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                <div className="font-mono text-sm">Signing with wallet…</div>
+                <div className="font-mono text-sm">Signing attestation with wallet...</div>
                 <div className="text-xs text-muted-foreground">Approve in your wallet</div>
               </div>
             )}
