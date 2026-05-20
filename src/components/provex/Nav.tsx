@@ -2,12 +2,17 @@ import { Link, useLocation } from "react-router-dom";
 import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
 import { ConnectWallet } from "./ConnectWallet";
+import { WalletDiagnostics } from "./WalletDiagnostics";
+import { MobileNav } from "./MobileNav";
 
 const links = [
   { to: "/app", label: "Dashboard" },
   { to: "/explorer", label: "Explorer" },
   { to: "/models", label: "Models" },
+  { to: "/simulation", label: "Simulation" },
   { to: "/api", label: "API" },
+  { to: "/docs", label: "Docs" },
+  { to: "/settings", label: "Settings" },
 ];
 
 export const Nav = () => {
@@ -16,8 +21,8 @@ export const Nav = () => {
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/60 backdrop-blur-xl">
       <div className="container flex h-16 items-center justify-between gap-3">
         <Link to="/" aria-label="Provex home" className="shrink-0"><Logo /></Link>
-        <nav className="hidden md:flex items-center gap-1 font-mono text-xs uppercase tracking-wider">
-          {links.map(l => (
+        <nav className="hidden lg:flex items-center gap-1 font-mono text-xs uppercase tracking-wider">
+          {links.slice(0, 5).map(l => (
             <Link
               key={l.to}
               to={l.to}
@@ -32,7 +37,11 @@ export const Nav = () => {
             </Link>
           ))}
         </nav>
-        <ConnectWallet />
+        <div className="flex items-center gap-2">
+          <WalletDiagnostics />
+          <ConnectWallet />
+          <MobileNav links={links} />
+        </div>
       </div>
     </header>
   );
