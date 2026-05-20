@@ -118,7 +118,7 @@ const DatasetDetail = () => {
           <div className="glass rounded-2xl p-6">
             <h3 className="font-semibold flex items-center gap-2"><Hash className="h-4 w-4 text-primary" /> Parents ({parents.length})</h3>
             {parents.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">Root dataset — no parents.</p>
+              <p className="mt-3 text-sm text-muted-foreground">Root dataset - no parents.</p>
             ) : (
               <ul className="mt-3 space-y-2">
                 {parents.map(p => (

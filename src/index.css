@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Provex design system — Shelby-inspired warm dark + hot pink, with mint "verified" accent. */
+/* Provex design system - Shelby-inspired warm dark + hot pink, with mint "verified" accent. */
 
 @layer base {
   :root {

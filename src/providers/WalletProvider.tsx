@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { pushDiag } from "@/lib/walletDiagnostics";
 
 /**
- * Wallet provider — wallet-adapter v8 auto-discovers AIP-62 wallets installed
+ * Wallet provider - wallet-adapter v8 auto-discovers AIP-62 wallets installed
  * in the browser (Petra, Martian, Pontem, OKX, Nightly, etc.). Provex requires
  * Aptos TESTNET so the Shelby blob attestation flow validates against the
  * shared testnet indexer.

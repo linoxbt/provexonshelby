@@ -46,7 +46,7 @@ const ApiKeys = () => {
     });
     if (error || data?.error) { toast.error(error?.message ?? data?.error); return; }
     setActiveKey(data.plaintext_key);
-    toast.success("New API key generated — copy it now, it won't be shown again");
+    toast.success("New API key generated - copy it now, it won't be shown again");
     refresh();
   };
 
@@ -109,7 +109,7 @@ console.log(proof.verified); // true`, [snippetKey]);
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">It will not be shown again — only the prefix is stored.</p>
+                <p className="text-xs text-muted-foreground mt-2">It will not be shown again - only the prefix is stored.</p>
               </div>
             )}
 

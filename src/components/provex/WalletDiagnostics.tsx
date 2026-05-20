@@ -39,11 +39,11 @@ export const WalletDiagnostics = () => {
         <div className="mt-6 glass rounded-xl p-4">
           <h4 className="font-semibold text-sm mb-2">Connection</h4>
           <Row label="Status" value={isLoading ? "loading…" : connected ? "connected" : "disconnected"} ok={connected} />
-          <Row label="Adapter" value={wallet?.name ?? "—"} />
-          <Row label="Address" value={account?.address?.toString() ?? "—"} />
+          <Row label="Adapter" value={wallet?.name ?? "-"} />
+          <Row label="Address" value={account?.address?.toString() ?? "-"} />
           <Row
             label="Network"
-            value={connected ? `${current ?? "unknown"} (required: ${required})` : "—"}
+            value={connected ? `${current ?? "unknown"} (required: ${required})` : "-"}
             ok={connected ? isCorrect : undefined}
           />
           {connected && !isCorrect && (

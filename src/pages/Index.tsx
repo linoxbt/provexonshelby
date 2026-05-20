@@ -68,7 +68,7 @@ const Index = () => {
               Verifiable Data <br /> Provenance on <span className="text-gradient">Shelby</span>.
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl">
-              Sign your data, store it on Shelby, and prove its origin on Aptos — forever.
+              Sign your data, store it on Shelby, and prove its origin on Aptos - forever.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-90">
@@ -98,7 +98,7 @@ const Index = () => {
                 <div className="font-mono text-xs text-muted-foreground">Connecting to feed…</div>
               ) : display.length === 0 ? (
                 <div className="font-mono text-xs text-muted-foreground">
-                  No attestations yet. Be the first — <Link to="/app" className="text-primary underline">upload a file</Link>.
+                  No attestations yet. Be the first - <Link to="/app" className="text-primary underline">upload a file</Link>.
                 </div>
               ) : (
                 <div className="marquee font-mono text-xs">
@@ -134,7 +134,7 @@ const Index = () => {
 
         <div className="mt-12 grid md:grid-cols-3 gap-5">
           {[
-            { n: "01", title: "Sign Data", icon: FileSignature, body: "Your wallet signs file metadata locally — never the file itself leaves unencrypted." },
+            { n: "01", title: "Sign Data", icon: FileSignature, body: "Your wallet signs file metadata locally - never the file itself leaves unencrypted." },
             { n: "02", title: "Store on Shelby", icon: Database, body: "The blob is uploaded to Shelby's global namespace. You receive a Blob ID commitment." },
             { n: "03", title: "Verify on Aptos", icon: ShieldCheck, body: "An attestation is anchored on Aptos linking the Blob ID to your DID forever." },
           ].map(s => (

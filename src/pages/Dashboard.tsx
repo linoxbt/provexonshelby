@@ -97,7 +97,7 @@ const Dashboard = () => {
       const blobId = await sha256Hex(bytes);
 
       // 2) Sign the canonical attestation message with the Aptos wallet.
-      //    Same Ed25519 key signs Shelby commitments — wallet signs once.
+      //    Same Ed25519 key signs Shelby commitments - wallet signs once.
       setStage("signing");
       const message = `Provex attestation\nBlobID: ${blobId}\nFile: ${file.name}\nSize: ${bytes.byteLength}\nUploader: ${wallet}\nAt: ${new Date().toISOString()}`;
       const signRes: any = await signMessage({
@@ -110,7 +110,7 @@ const Dashboard = () => {
         (Array.isArray(account?.publicKey) ? account.publicKey[0] : String(account?.publicKey ?? ""));
       const fullMessage: string = signRes?.fullMessage ?? message;
 
-      // 3) Upload to Shelby (via edge function — bytes are stored, BlobID anchored)
+      // 3) Upload to Shelby (via edge function - bytes are stored, BlobID anchored)
       setStage("uploading");
       const fd = new FormData();
       fd.append("file", file);
@@ -137,7 +137,7 @@ const Dashboard = () => {
 
       if (result.error) throw new Error(result.error);
 
-      // 4) Anchor on Aptos (best-effort — only if module address is configured)
+      // 4) Anchor on Aptos (best-effort - only if module address is configured)
       const moduleAddr = import.meta.env.VITE_PROVEX_MODULE_ADDRESS as string | undefined;
       if (moduleAddr && signAndSubmitTransaction) {
         setStage("anchoring");
@@ -384,7 +384,7 @@ const Dashboard = () => {
                 })}
                 {datasets.length === 0 && (
                   <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                    {wallet ? "No datasets yet — upload your first file above." : "Connect a wallet to see your datasets."}
+                    {wallet ? "No datasets yet - upload your first file above." : "Connect a wallet to see your datasets."}
                   </td></tr>
                 )}
               </tbody>
