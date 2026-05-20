@@ -9,10 +9,8 @@ const links = [
   { to: "/app", label: "Dashboard" },
   { to: "/explorer", label: "Explorer" },
   { to: "/models", label: "Models" },
-  { to: "/simulation", label: "Simulation" },
   { to: "/api", label: "API" },
   { to: "/docs", label: "Docs" },
-  { to: "/settings", label: "Settings" },
 ];
 
 export const Nav = () => {
@@ -22,7 +20,7 @@ export const Nav = () => {
       <div className="container flex h-16 items-center justify-between gap-3">
         <Link to="/" aria-label="Provex home" className="shrink-0"><Logo /></Link>
         <nav className="hidden lg:flex items-center gap-1 font-mono text-xs uppercase tracking-wider">
-          {links.slice(0, 5).map(l => (
+          {links.map(l => (
             <Link
               key={l.to}
               to={l.to}

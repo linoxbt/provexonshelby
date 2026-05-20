@@ -178,7 +178,7 @@ const Explorer = () => {
                 <>
                   {!result.lineage?.length ? (
                     <p className="mt-6 text-sm text-muted-foreground">
-                      No lineage recorded — this is a root dataset.
+                      No lineage recorded - this is a root dataset.
                     </p>
                   ) : (
                     <ul className="mt-4 divide-y divide-border/60">

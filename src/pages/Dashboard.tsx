@@ -11,7 +11,9 @@ import { ConnectWallet } from "@/components/provex/ConnectWallet";
 import { useAptosNetwork, REQUIRED_NETWORK } from "@/hooks/useAptosNetwork";
 import { Button as UIButton } from "@/components/ui/button";
 
-type Stage = "idle" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
+type Stage = "idle" | "fee" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
+
+const UPLOAD_FEE_SHELBY_USDT = 0.1;
 
 const Stat = ({ label, value, icon: Icon, sub }: { label: string; value: string; icon: any; sub?: string }) => (
   <div className="glass rounded-2xl p-6">
@@ -96,8 +98,19 @@ const Dashboard = () => {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const blobId = await sha256Hex(bytes);
 
+      // 1b) Require explicit signed acknowledgement of the 0.1 ShelbyUSDT upload fee.
+      setStage("fee");
+      const feeMessage = `Provex upload fee\nAmount: ${UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT\nBlobID: ${blobId}\nUploader: ${wallet}\nAt: ${new Date().toISOString()}`;
+      try {
+        await signMessage({ message: feeMessage, nonce: `fee-${blobId.slice(0, 12)}` });
+      } catch (e: any) {
+        throw new Error(e?.message?.toLowerCase?.().includes("reject")
+          ? "Upload fee was declined in your wallet"
+          : (e?.message ?? "Fee signature failed"));
+      }
+
       // 2) Sign the canonical attestation message with the Aptos wallet.
-      //    Same Ed25519 key signs Shelby commitments — wallet signs once.
+      //    Same Ed25519 key signs Shelby commitments - wallet signs once.
       setStage("signing");
       const message = `Provex attestation\nBlobID: ${blobId}\nFile: ${file.name}\nSize: ${bytes.byteLength}\nUploader: ${wallet}\nAt: ${new Date().toISOString()}`;
       const signRes: any = await signMessage({
@@ -110,7 +123,7 @@ const Dashboard = () => {
         (Array.isArray(account?.publicKey) ? account.publicKey[0] : String(account?.publicKey ?? ""));
       const fullMessage: string = signRes?.fullMessage ?? message;
 
-      // 3) Upload to Shelby (via edge function — bytes are stored, BlobID anchored)
+      // 3) Upload to Shelby (via edge function - bytes are stored, BlobID anchored)
       setStage("uploading");
       const fd = new FormData();
       fd.append("file", file);
@@ -137,7 +150,7 @@ const Dashboard = () => {
 
       if (result.error) throw new Error(result.error);
 
-      // 4) Anchor on Aptos (best-effort — only if module address is configured)
+      // 4) Anchor on Aptos (best-effort - only if module address is configured)
       const moduleAddr = import.meta.env.VITE_PROVEX_MODULE_ADDRESS as string | undefined;
       if (moduleAddr && signAndSubmitTransaction) {
         setStage("anchoring");
@@ -244,24 +257,36 @@ const Dashboard = () => {
                 <Upload className="mx-auto h-8 w-8 text-primary" />
                 <h3 className="mt-4 text-xl font-semibold">Drop a file to attest</h3>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Files are signed locally with your wallet, then committed to Shelby and anchored on Aptos.
+                  Files are signed locally with your wallet, committed to Shelby, and anchored on Aptos.
                 </p>
-                <Button onClick={() => fileInput.current?.click()} className="mt-6 bg-gradient-primary text-primary-foreground shadow-glow">
-                  Choose File
-                </Button>
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 font-mono text-[11px] uppercase tracking-widest">
+                  Base fee: {UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT
+                </p>
+                <div>
+                  <Button onClick={() => fileInput.current?.click()} className="mt-6 bg-gradient-primary text-primary-foreground shadow-glow">
+                    Choose File
+                  </Button>
+                </div>
               </>
             )}
 
             {stage === "hashing" && (
               <div className="py-6 flex flex-col items-center gap-3">
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                <div className="font-mono text-sm">Hashing file → Shelby BlobID…</div>
+                <div className="font-mono text-sm">Hashing file to Shelby BlobID...</div>
+              </div>
+            )}
+            {stage === "fee" && (
+              <div className="py-6 flex flex-col items-center gap-3">
+                <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                <div className="font-mono text-sm">Confirm {UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT upload fee...</div>
+                <div className="text-xs text-muted-foreground">Approve the fee in your wallet to continue</div>
               </div>
             )}
             {stage === "signing" && (
               <div className="py-6 flex flex-col items-center gap-3">
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                <div className="font-mono text-sm">Signing with wallet…</div>
+                <div className="font-mono text-sm">Signing attestation with wallet...</div>
                 <div className="text-xs text-muted-foreground">Approve in your wallet</div>
               </div>
             )}
@@ -384,7 +409,7 @@ const Dashboard = () => {
                 })}
                 {datasets.length === 0 && (
                   <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                    {wallet ? "No datasets yet — upload your first file above." : "Connect a wallet to see your datasets."}
+                    {wallet ? "No datasets yet - upload your first file above." : "Connect a wallet to see your datasets."}
                   </td></tr>
                 )}
               </tbody>

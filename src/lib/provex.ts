@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * sha256 helper using WebCrypto (browser).
- * Returns lowercase hex string — same shape Shelby returns for BlobIDs.
+ * Returns lowercase hex string - same shape Shelby returns for BlobIDs.
  */
 export async function sha256Hex(data: ArrayBuffer | Uint8Array): Promise<string> {
   const ab: ArrayBuffer =
@@ -16,10 +16,10 @@ export async function sha256Hex(data: ArrayBuffer | Uint8Array): Promise<string>
 }
 
 export const shortAddr = (a: string | null | undefined) =>
-  a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—";
+  a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "-";
 
 export const shortBlob = (b: string | null | undefined) =>
-  b ? `0x${b.slice(0, 4)}…${b.slice(-4)}` : "—";
+  b ? `0x${b.slice(0, 4)}…${b.slice(-4)}` : "-";
 
 export type Dataset = {
   id: string;
