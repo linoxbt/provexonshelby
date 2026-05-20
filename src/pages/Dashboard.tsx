@@ -257,11 +257,16 @@ const Dashboard = () => {
                 <Upload className="mx-auto h-8 w-8 text-primary" />
                 <h3 className="mt-4 text-xl font-semibold">Drop a file to attest</h3>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Files are signed locally with your wallet, then committed to Shelby and anchored on Aptos.
+                  Files are signed locally with your wallet, committed to Shelby, and anchored on Aptos.
                 </p>
-                <Button onClick={() => fileInput.current?.click()} className="mt-6 bg-gradient-primary text-primary-foreground shadow-glow">
-                  Choose File
-                </Button>
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 font-mono text-[11px] uppercase tracking-widest">
+                  Base fee: {UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT
+                </p>
+                <div>
+                  <Button onClick={() => fileInput.current?.click()} className="mt-6 bg-gradient-primary text-primary-foreground shadow-glow">
+                    Choose File
+                  </Button>
+                </div>
               </>
             )}
 
