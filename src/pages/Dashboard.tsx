@@ -201,6 +201,16 @@ const Dashboard = () => {
           <Stat label="Active Storage Providers" value="37" icon={Database} sub="Shelby network" />
         </div>
 
+        {connected && !networkOk && (
+          <div className="mt-6 rounded-xl border border-primary/40 bg-primary/10 p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm">
+              Wallet is on <span className="font-mono">{currentNetwork ?? "unknown"}</span>.
+              Provex requires <span className="font-mono">{REQUIRED_NETWORK}</span> for Shelby signing and uploads.
+            </div>
+            <UIButton size="sm" onClick={switchToTestnet}>Switch network</UIButton>
+          </div>
+        )}
+
         {/* Upload */}
         <div className="mt-8 grid lg:grid-cols-3 gap-4">
           <div
