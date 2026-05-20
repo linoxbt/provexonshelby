@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { sha256Hex, shortAddr, type Dataset } from "@/lib/provex";
 import { toast } from "sonner";
 import { ConnectWallet } from "@/components/provex/ConnectWallet";
+import { useAptosNetwork, REQUIRED_NETWORK } from "@/hooks/useAptosNetwork";
+import { Button as UIButton } from "@/components/ui/button";
 
 type Stage = "idle" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
 
@@ -25,6 +27,7 @@ const Stat = ({ label, value, icon: Icon, sub }: { label: string; value: string;
 const Dashboard = () => {
   const { connected, account, signMessage, signAndSubmitTransaction } = useWallet();
   const wallet = account?.address?.toString().toLowerCase() ?? null;
+  const { isCorrect: networkOk, switchToTestnet, current: currentNetwork } = useAptosNetwork();
 
   const [stage, setStage] = useState<Stage>("idle");
   const [progress, setProgress] = useState(0);
@@ -77,6 +80,10 @@ const Dashboard = () => {
   const handleFile = useCallback(async (file: File) => {
     if (!connected || !wallet || !signMessage) {
       toast.error("Connect your wallet first");
+      return;
+    }
+    if (!networkOk) {
+      toast.error(`Switch your wallet to Aptos ${REQUIRED_NETWORK} to upload`);
       return;
     }
     setError(null);
@@ -163,7 +170,7 @@ const Dashboard = () => {
       setStage("error");
       toast.error(e?.message ?? "Upload failed");
     }
-  }, [connected, wallet, signMessage, signAndSubmitTransaction, account, refresh]);
+  }, [connected, wallet, signMessage, signAndSubmitTransaction, account, refresh, networkOk]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
