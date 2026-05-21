@@ -18,6 +18,65 @@ const DatasetDetail = () => {
   const [children, setChildren] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Streaming download + verification state
+  const [dlState, setDlState] = useState<"idle" | "downloading" | "verifying" | "done" | "error">("idle");
+  const [dlProgress, setDlProgress] = useState(0);
+  const [dlReceived, setDlReceived] = useState(0);
+  const [dlTotal, setDlTotal] = useState(0);
+  const [dlHash, setDlHash] = useState<string | null>(null);
+  const [dlMatch, setDlMatch] = useState<boolean | null>(null);
+  const [dlError, setDlError] = useState<string | null>(null);
+
+  const streamDownload = async () => {
+    if (!dataset) return;
+    setDlState("downloading");
+    setDlProgress(0); setDlReceived(0); setDlTotal(0);
+    setDlHash(null); setDlMatch(null); setDlError(null);
+    try {
+      const { data } = supabase.storage.from("shelby-blobs").getPublicUrl(dataset.storage_path);
+      const res = await fetch(data.publicUrl);
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      const total = Number(res.headers.get("content-length") ?? dataset.size_bytes);
+      setDlTotal(total);
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          received += value.byteLength;
+          setDlReceived(received);
+          if (total > 0) setDlProgress(Math.min(100, Math.round((received / total) * 100)));
+        }
+      }
+      setDlState("verifying");
+      const merged = new Uint8Array(received);
+      let offset = 0;
+      for (const c of chunks) { merged.set(c, offset); offset += c.byteLength; }
+      const computed = await sha256Hex(merged);
+      setDlHash(computed);
+      const expected = dataset.blob_id.toLowerCase().replace(/^0x/, "");
+      const match = computed === expected;
+      setDlMatch(match);
+      const blob = new Blob([merged], { type: dataset.mime_type || "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = dataset.file_name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setDlState("done");
+      if (match) toast.success("Download verified - SHA-256 matches Blob ID");
+      else toast.error("Hash mismatch - file may be tampered");
+    } catch (e: any) {
+      setDlError(e?.message ?? "Download failed");
+      setDlState("error");
+      toast.error(e?.message ?? "Download failed");
+    }
+  };
+
+
   useEffect(() => {
     if (!blobId) return;
     const id = blobId.toLowerCase().replace(/^0x/, "");
