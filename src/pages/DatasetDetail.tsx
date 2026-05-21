@@ -218,6 +218,105 @@ const DatasetDetail = () => {
           </div>
         </div>
 
+        {/* Streaming download progress + post-download SHA-256 verification */}
+        {dlState !== "idle" && (
+          <div className="mt-6 glass rounded-2xl p-6">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Download className="h-4 w-4 text-primary" /> Download &amp; Verification
+            </h3>
+            {(dlState === "downloading" || dlState === "verifying") && (
+              <div className="mt-4 space-y-2">
+                <Progress value={dlState === "verifying" ? 100 : dlProgress} />
+                <div className="flex justify-between font-mono text-xs text-muted-foreground">
+                  <span>
+                    {dlState === "verifying" ? "Computing SHA-256..." : `Streaming ${dlProgress}%`}
+                  </span>
+                  <span>
+                    {(dlReceived / 1e6).toFixed(2)} MB
+                    {dlTotal ? ` / ${(dlTotal / 1e6).toFixed(2)} MB` : ""}
+                  </span>
+                </div>
+              </div>
+            )}
+            {dlState === "done" && dlHash && (
+              <div className="mt-4 space-y-3">
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-widest ${
+                  dlMatch ? "bg-accent/15 text-accent" : "bg-destructive/15 text-destructive"
+                }`}>
+                  {dlMatch ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                  {dlMatch ? "SHA-256 verified" : "Hash mismatch"}
+                </div>
+                <div>
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Computed</div>
+                  <div className="mt-1 font-mono text-xs break-all">{dlHash}</div>
+                </div>
+                <div>
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Expected (Blob ID)</div>
+                  <div className="mt-1 font-mono text-xs break-all">{dataset.blob_id}</div>
+                </div>
+              </div>
+            )}
+            {dlState === "error" && (
+              <p className="mt-3 text-sm text-destructive">{dlError}</p>
+            )}
+          </div>
+        )}
+
+        {/* Fee receipt panel */}
+        {attestation?.fee_tx_hash && (
+          <div className="mt-6 glass rounded-2xl p-6">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-primary" /> Fee Receipt
+            </h3>
+            <div className="mt-4 grid md:grid-cols-3 gap-4">
+              <div>
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Amount</div>
+                <div className="mt-1 font-mono text-sm">
+                  {attestation.fee_amount ?? "0.1"} {attestation.fee_asset ?? "ShelbyUSDT"}
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Status</div>
+                <div className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider ${
+                  attestation.fee_status === "settled" ? "bg-accent/15 text-accent" : "bg-primary/15 text-primary"
+                }`}>
+                  {attestation.fee_status === "settled" ? <CheckCircle2 className="h-3 w-3" /> : <Loader2 className="h-3 w-3" />}
+                  {attestation.fee_status ?? "pending"}
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Paid</div>
+                <div className="mt-1 font-mono text-sm">{new Date(attestation.created_at).toLocaleString()}</div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Aptos transaction</div>
+              <a
+                href={APTOS_EXPLORER(attestation.fee_tx_hash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-primary hover:underline break-all"
+              >
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                {attestation.fee_tx_hash}
+              </a>
+            </div>
+            {attestation.fee_message && (
+              <div className="mt-4">
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Signed fee details</div>
+                <pre className="mt-1 font-mono text-xs whitespace-pre-wrap text-muted-foreground">{attestation.fee_message}</pre>
+              </div>
+            )}
+            {attestation.fee_signature && (
+              <div className="mt-3">
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Wallet signature</div>
+                <div className="mt-1 font-mono text-xs break-all">{attestation.fee_signature}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+
         {attestation && (
           <div className="mt-6 glass rounded-2xl p-6">
             <h3 className="font-semibold">Signature</h3>
