@@ -20,6 +20,12 @@ Deno.serve(async (req) => {
     const license = String(form.get("license") ?? "CC-BY-SA-4.0");
     const parentBlobIds = String(form.get("parent_blob_ids") ?? "")
       .split(",").map((s) => s.trim()).filter(Boolean);
+    const feeTxHash = String(form.get("fee_tx_hash") ?? "");
+    const feeAmount = Number(form.get("fee_amount") ?? 0) || null;
+    const feeAsset = String(form.get("fee_asset") ?? "ShelbyUSDT");
+    const feeSignature = String(form.get("fee_signature") ?? "");
+    const feeMessage = String(form.get("fee_message") ?? "");
+    const feeStatus = String(form.get("fee_status") ?? "pending");
 
     if (!file) return json({ error: "file is required" }, 400);
     if (!signature || !publicKey || !message)
