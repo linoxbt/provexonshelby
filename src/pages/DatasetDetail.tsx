@@ -2,9 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { PageShell } from "@/components/provex/PageShell";
 import { Button } from "@/components/ui/button";
-import { Download, ShieldCheck, ShieldAlert, GitBranch, ExternalLink, Hash } from "lucide-react";
+import { Download, ShieldCheck, ShieldAlert, GitBranch, ExternalLink, Hash, Receipt, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { downloadBlob, shortAddr, type Attestation, type Dataset } from "@/lib/provex";
+import { shortAddr, sha256Hex, type Attestation, type Dataset } from "@/lib/provex";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
+
+const APTOS_EXPLORER = (h: string) => `https://explorer.aptoslabs.com/txn/${h}?network=testnet`;
 
 const DatasetDetail = () => {
   const { blobId } = useParams();
@@ -13,6 +17,65 @@ const DatasetDetail = () => {
   const [parents, setParents] = useState<string[]>([]);
   const [children, setChildren] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Streaming download + verification state
+  const [dlState, setDlState] = useState<"idle" | "downloading" | "verifying" | "done" | "error">("idle");
+  const [dlProgress, setDlProgress] = useState(0);
+  const [dlReceived, setDlReceived] = useState(0);
+  const [dlTotal, setDlTotal] = useState(0);
+  const [dlHash, setDlHash] = useState<string | null>(null);
+  const [dlMatch, setDlMatch] = useState<boolean | null>(null);
+  const [dlError, setDlError] = useState<string | null>(null);
+
+  const streamDownload = async () => {
+    if (!dataset) return;
+    setDlState("downloading");
+    setDlProgress(0); setDlReceived(0); setDlTotal(0);
+    setDlHash(null); setDlMatch(null); setDlError(null);
+    try {
+      const { data } = supabase.storage.from("shelby-blobs").getPublicUrl(dataset.storage_path);
+      const res = await fetch(data.publicUrl);
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      const total = Number(res.headers.get("content-length") ?? dataset.size_bytes);
+      setDlTotal(total);
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          received += value.byteLength;
+          setDlReceived(received);
+          if (total > 0) setDlProgress(Math.min(100, Math.round((received / total) * 100)));
+        }
+      }
+      setDlState("verifying");
+      const merged = new Uint8Array(received);
+      let offset = 0;
+      for (const c of chunks) { merged.set(c, offset); offset += c.byteLength; }
+      const computed = await sha256Hex(merged);
+      setDlHash(computed);
+      const expected = dataset.blob_id.toLowerCase().replace(/^0x/, "");
+      const match = computed === expected;
+      setDlMatch(match);
+      const blob = new Blob([merged], { type: dataset.mime_type || "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = dataset.file_name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setDlState("done");
+      if (match) toast.success("Download verified - SHA-256 matches Blob ID");
+      else toast.error("Hash mismatch - file may be tampered");
+    } catch (e: any) {
+      setDlError(e?.message ?? "Download failed");
+      setDlState("error");
+      toast.error(e?.message ?? "Download failed");
+    }
+  };
+
 
   useEffect(() => {
     if (!blobId) return;
@@ -68,10 +131,16 @@ const DatasetDetail = () => {
               <Link to={`/explorer/${dataset.blob_id}`}><GitBranch className="h-4 w-4 mr-1.5" /> Lineage</Link>
             </Button>
             <Button
-              onClick={() => downloadBlob(dataset.storage_path, dataset.file_name)}
+              onClick={streamDownload}
+              disabled={dlState === "downloading" || dlState === "verifying"}
               className="bg-gradient-primary text-primary-foreground shadow-glow"
             >
-              <Download className="h-4 w-4 mr-1.5" /> Download
+              {dlState === "downloading" || dlState === "verifying"
+                ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                : <Download className="h-4 w-4 mr-1.5" />}
+              {dlState === "downloading" ? `Downloading ${dlProgress}%`
+                : dlState === "verifying" ? "Verifying..."
+                : "Download"}
             </Button>
           </div>
         </div>
@@ -148,6 +217,105 @@ const DatasetDetail = () => {
             )}
           </div>
         </div>
+
+        {/* Streaming download progress + post-download SHA-256 verification */}
+        {dlState !== "idle" && (
+          <div className="mt-6 glass rounded-2xl p-6">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Download className="h-4 w-4 text-primary" /> Download &amp; Verification
+            </h3>
+            {(dlState === "downloading" || dlState === "verifying") && (
+              <div className="mt-4 space-y-2">
+                <Progress value={dlState === "verifying" ? 100 : dlProgress} />
+                <div className="flex justify-between font-mono text-xs text-muted-foreground">
+                  <span>
+                    {dlState === "verifying" ? "Computing SHA-256..." : `Streaming ${dlProgress}%`}
+                  </span>
+                  <span>
+                    {(dlReceived / 1e6).toFixed(2)} MB
+                    {dlTotal ? ` / ${(dlTotal / 1e6).toFixed(2)} MB` : ""}
+                  </span>
+                </div>
+              </div>
+            )}
+            {dlState === "done" && dlHash && (
+              <div className="mt-4 space-y-3">
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-widest ${
+                  dlMatch ? "bg-accent/15 text-accent" : "bg-destructive/15 text-destructive"
+                }`}>
+                  {dlMatch ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                  {dlMatch ? "SHA-256 verified" : "Hash mismatch"}
+                </div>
+                <div>
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Computed</div>
+                  <div className="mt-1 font-mono text-xs break-all">{dlHash}</div>
+                </div>
+                <div>
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Expected (Blob ID)</div>
+                  <div className="mt-1 font-mono text-xs break-all">{dataset.blob_id}</div>
+                </div>
+              </div>
+            )}
+            {dlState === "error" && (
+              <p className="mt-3 text-sm text-destructive">{dlError}</p>
+            )}
+          </div>
+        )}
+
+        {/* Fee receipt panel */}
+        {attestation?.fee_tx_hash && (
+          <div className="mt-6 glass rounded-2xl p-6">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-primary" /> Fee Receipt
+            </h3>
+            <div className="mt-4 grid md:grid-cols-3 gap-4">
+              <div>
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Amount</div>
+                <div className="mt-1 font-mono text-sm">
+                  {attestation.fee_amount ?? "0.1"} {attestation.fee_asset ?? "ShelbyUSDT"}
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Status</div>
+                <div className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider ${
+                  attestation.fee_status === "settled" ? "bg-accent/15 text-accent" : "bg-primary/15 text-primary"
+                }`}>
+                  {attestation.fee_status === "settled" ? <CheckCircle2 className="h-3 w-3" /> : <Loader2 className="h-3 w-3" />}
+                  {attestation.fee_status ?? "pending"}
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Paid</div>
+                <div className="mt-1 font-mono text-sm">{new Date(attestation.created_at).toLocaleString()}</div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Aptos transaction</div>
+              <a
+                href={APTOS_EXPLORER(attestation.fee_tx_hash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-primary hover:underline break-all"
+              >
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                {attestation.fee_tx_hash}
+              </a>
+            </div>
+            {attestation.fee_message && (
+              <div className="mt-4">
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Signed fee details</div>
+                <pre className="mt-1 font-mono text-xs whitespace-pre-wrap text-muted-foreground">{attestation.fee_message}</pre>
+              </div>
+            )}
+            {attestation.fee_signature && (
+              <div className="mt-3">
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Wallet signature</div>
+                <div className="mt-1 font-mono text-xs break-all">{attestation.fee_signature}</div>
+              </div>
+            )}
+          </div>
+        )}
+
 
         {attestation && (
           <div className="mt-6 glass rounded-2xl p-6">

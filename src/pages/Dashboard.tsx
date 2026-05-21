@@ -11,9 +11,32 @@ import { ConnectWallet } from "@/components/provex/ConnectWallet";
 import { useAptosNetwork, REQUIRED_NETWORK } from "@/hooks/useAptosNetwork";
 import { Button as UIButton } from "@/components/ui/button";
 
-type Stage = "idle" | "fee" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
+type Stage = "idle" | "fee" | "fee-confirming" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
 
 const UPLOAD_FEE_SHELBY_USDT = 0.1;
+// 0.1 ShelbyUSDT settles on-chain as 0.1 APT (10_000_000 octas) on Aptos Testnet.
+// Mainnet uses the same flow but the network guard blocks it until mainnet is enabled.
+const FEE_OCTAS = 10_000_000;
+const FEE_RECIPIENT =
+  (import.meta.env.VITE_PROVEX_FEE_RECIPIENT as string | undefined) || "0x1";
+const APTOS_NODE = "https://fullnode.testnet.aptoslabs.com/v1";
+export const explorerTxUrl = (hash: string) =>
+  `https://explorer.aptoslabs.com/txn/${hash}?network=testnet`;
+
+async function waitForTx(hash: string, timeoutMs = 30_000): Promise<{ success: boolean; vm_status?: string }> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`${APTOS_NODE}/transactions/by_hash/${hash}`);
+      if (res.status === 200) {
+        const j = await res.json();
+        if (j.type === "user_transaction") return { success: !!j.success, vm_status: j.vm_status };
+      }
+    } catch {}
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  return { success: false, vm_status: "timeout" };
+}
 
 const Stat = ({ label, value, icon: Icon, sub }: { label: string; value: string; icon: any; sub?: string }) => (
   <div className="glass rounded-2xl p-6">
@@ -98,38 +121,66 @@ const Dashboard = () => {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const blobId = await sha256Hex(bytes);
 
-      // 1b) Require explicit signed acknowledgement of the 0.1 ShelbyUSDT upload fee.
+      // 1b) Real on-chain settlement of the 0.1 ShelbyUSDT fee, then a signed receipt.
       setStage("fee");
-      const feeMessage = `Provex upload fee\nAmount: ${UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT\nBlobID: ${blobId}\nUploader: ${wallet}\nAt: ${new Date().toISOString()}`;
+      const feeMessage = `Provex upload fee\nAmount: ${UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT\nBlobID: ${blobId}\nUploader: ${wallet}\nRecipient: ${FEE_RECIPIENT}\nAt: ${new Date().toISOString()}`;
+
+      let feeTxHash = "";
+      let feeStatus: "settled" | "failed" = "failed";
+      let feeSignature = "";
       try {
-        await signMessage({ message: feeMessage, nonce: `fee-${blobId.slice(0, 12)}` });
+        if (!signAndSubmitTransaction) throw new Error("Wallet does not support on-chain transfers");
+        const pending: any = await signAndSubmitTransaction({
+          data: {
+            function: "0x1::aptos_account::transfer",
+            functionArguments: [FEE_RECIPIENT, FEE_OCTAS.toString()],
+          },
+        } as any);
+        feeTxHash = pending?.hash ?? pending?.transactionHash ?? pending?.txnHash ?? "";
+        if (!feeTxHash) throw new Error("Wallet returned no transaction hash");
+
+        setStage("fee-confirming");
+        const conf = await waitForTx(feeTxHash);
+        if (!conf.success) throw new Error(`Fee tx not confirmed (${conf.vm_status ?? "unknown"})`);
+        feeStatus = "settled";
+
+        // Bind the on-chain hash to the uploader with a signed receipt.
+        const receiptSig: any = await signMessage({
+          message: `${feeMessage}\nTxHash: ${feeTxHash}`,
+          nonce: `fee-${blobId.slice(0, 12)}`,
+        });
+        feeSignature = receiptSig?.signature?.toString?.() ?? String(receiptSig?.signature ?? "");
       } catch (e: any) {
-        throw new Error(e?.message?.toLowerCase?.().includes("reject")
+        const msg = e?.message ?? String(e);
+        throw new Error(msg.toLowerCase().includes("reject")
           ? "Upload fee was declined in your wallet"
-          : (e?.message ?? "Fee signature failed"));
+          : `Fee settlement failed: ${msg}`);
       }
 
-      // 2) Sign the canonical attestation message with the Aptos wallet.
-      //    Same Ed25519 key signs Shelby commitments - wallet signs once.
+      // 2) Sign the canonical attestation message.
       setStage("signing");
       const message = `Provex attestation\nBlobID: ${blobId}\nFile: ${file.name}\nSize: ${bytes.byteLength}\nUploader: ${wallet}\nAt: ${new Date().toISOString()}`;
-      const signRes: any = await signMessage({
-        message,
-        nonce: blobId.slice(0, 16),
-      });
+      const signRes: any = await signMessage({ message, nonce: blobId.slice(0, 16) });
       const signature: string = signRes?.signature?.toString?.() ?? String(signRes?.signature ?? "");
       const publicKey: string =
         account?.publicKey?.toString?.() ??
         (Array.isArray(account?.publicKey) ? account.publicKey[0] : String(account?.publicKey ?? ""));
       const fullMessage: string = signRes?.fullMessage ?? message;
 
-      // 3) Upload to Shelby (via edge function - bytes are stored, BlobID anchored)
+      // 3) Upload to Shelby (edge function).
       setStage("uploading");
       const fd = new FormData();
       fd.append("file", file);
       fd.append("signature", signature);
       fd.append("public_key", publicKey);
       fd.append("message", fullMessage);
+      fd.append("fee_tx_hash", feeTxHash);
+      fd.append("fee_amount", String(UPLOAD_FEE_SHELBY_USDT));
+      fd.append("fee_asset", "ShelbyUSDT");
+      fd.append("fee_signature", feeSignature);
+      fd.append("fee_message", feeMessage);
+      fd.append("fee_status", feeStatus);
+
 
       const xhr = new XMLHttpRequest();
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attest-upload`;
@@ -279,8 +330,14 @@ const Dashboard = () => {
             {stage === "fee" && (
               <div className="py-6 flex flex-col items-center gap-3">
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                <div className="font-mono text-sm">Confirm {UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT upload fee...</div>
-                <div className="text-xs text-muted-foreground">Approve the fee in your wallet to continue</div>
+                <div className="font-mono text-sm">Approve {UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT transfer...</div>
+                <div className="text-xs text-muted-foreground">Sign the on-chain payment in your wallet</div>
+              </div>
+            )}
+            {stage === "fee-confirming" && (
+              <div className="py-6 flex flex-col items-center gap-3">
+                <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                <div className="font-mono text-sm">Waiting for fee transaction to settle on Aptos...</div>
               </div>
             )}
             {stage === "signing" && (
