@@ -19,6 +19,12 @@ export type Database = {
           aptos_tx_hash: string | null
           blob_id: string
           created_at: string
+          fee_amount: number | null
+          fee_asset: string | null
+          fee_message: string | null
+          fee_signature: string | null
+          fee_status: string | null
+          fee_tx_hash: string | null
           id: string
           message: string
           public_key: string
@@ -31,6 +37,12 @@ export type Database = {
           aptos_tx_hash?: string | null
           blob_id: string
           created_at?: string
+          fee_amount?: number | null
+          fee_asset?: string | null
+          fee_message?: string | null
+          fee_signature?: string | null
+          fee_status?: string | null
+          fee_tx_hash?: string | null
           id?: string
           message: string
           public_key: string
@@ -43,6 +55,12 @@ export type Database = {
           aptos_tx_hash?: string | null
           blob_id?: string
           created_at?: string
+          fee_amount?: number | null
+          fee_asset?: string | null
+          fee_message?: string | null
+          fee_signature?: string | null
+          fee_status?: string | null
+          fee_tx_hash?: string | null
           id?: string
           message?: string
           public_key?: string
