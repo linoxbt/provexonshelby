@@ -2,9 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { PageShell } from "@/components/provex/PageShell";
 import { Button } from "@/components/ui/button";
-import { Download, ShieldCheck, ShieldAlert, GitBranch, ExternalLink, Hash } from "lucide-react";
+import { Download, ShieldCheck, ShieldAlert, GitBranch, ExternalLink, Hash, Receipt, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { downloadBlob, shortAddr, type Attestation, type Dataset } from "@/lib/provex";
+import { shortAddr, sha256Hex, type Attestation, type Dataset } from "@/lib/provex";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
+
+const APTOS_EXPLORER = (h: string) => `https://explorer.aptoslabs.com/txn/${h}?network=testnet`;
 
 const DatasetDetail = () => {
   const { blobId } = useParams();
