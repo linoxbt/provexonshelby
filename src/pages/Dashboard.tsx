@@ -121,38 +121,66 @@ const Dashboard = () => {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const blobId = await sha256Hex(bytes);
 
-      // 1b) Require explicit signed acknowledgement of the 0.1 ShelbyUSDT upload fee.
+      // 1b) Real on-chain settlement of the 0.1 ShelbyUSDT fee, then a signed receipt.
       setStage("fee");
-      const feeMessage = `Provex upload fee\nAmount: ${UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT\nBlobID: ${blobId}\nUploader: ${wallet}\nAt: ${new Date().toISOString()}`;
+      const feeMessage = `Provex upload fee\nAmount: ${UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT\nBlobID: ${blobId}\nUploader: ${wallet}\nRecipient: ${FEE_RECIPIENT}\nAt: ${new Date().toISOString()}`;
+
+      let feeTxHash = "";
+      let feeStatus: "settled" | "failed" = "failed";
+      let feeSignature = "";
       try {
-        await signMessage({ message: feeMessage, nonce: `fee-${blobId.slice(0, 12)}` });
+        if (!signAndSubmitTransaction) throw new Error("Wallet does not support on-chain transfers");
+        const pending: any = await signAndSubmitTransaction({
+          data: {
+            function: "0x1::aptos_account::transfer",
+            functionArguments: [FEE_RECIPIENT, FEE_OCTAS.toString()],
+          },
+        } as any);
+        feeTxHash = pending?.hash ?? pending?.transactionHash ?? pending?.txnHash ?? "";
+        if (!feeTxHash) throw new Error("Wallet returned no transaction hash");
+
+        setStage("fee-confirming");
+        const conf = await waitForTx(feeTxHash);
+        if (!conf.success) throw new Error(`Fee tx not confirmed (${conf.vm_status ?? "unknown"})`);
+        feeStatus = "settled";
+
+        // Bind the on-chain hash to the uploader with a signed receipt.
+        const receiptSig: any = await signMessage({
+          message: `${feeMessage}\nTxHash: ${feeTxHash}`,
+          nonce: `fee-${blobId.slice(0, 12)}`,
+        });
+        feeSignature = receiptSig?.signature?.toString?.() ?? String(receiptSig?.signature ?? "");
       } catch (e: any) {
-        throw new Error(e?.message?.toLowerCase?.().includes("reject")
+        const msg = e?.message ?? String(e);
+        throw new Error(msg.toLowerCase().includes("reject")
           ? "Upload fee was declined in your wallet"
-          : (e?.message ?? "Fee signature failed"));
+          : `Fee settlement failed: ${msg}`);
       }
 
-      // 2) Sign the canonical attestation message with the Aptos wallet.
-      //    Same Ed25519 key signs Shelby commitments - wallet signs once.
+      // 2) Sign the canonical attestation message.
       setStage("signing");
       const message = `Provex attestation\nBlobID: ${blobId}\nFile: ${file.name}\nSize: ${bytes.byteLength}\nUploader: ${wallet}\nAt: ${new Date().toISOString()}`;
-      const signRes: any = await signMessage({
-        message,
-        nonce: blobId.slice(0, 16),
-      });
+      const signRes: any = await signMessage({ message, nonce: blobId.slice(0, 16) });
       const signature: string = signRes?.signature?.toString?.() ?? String(signRes?.signature ?? "");
       const publicKey: string =
         account?.publicKey?.toString?.() ??
         (Array.isArray(account?.publicKey) ? account.publicKey[0] : String(account?.publicKey ?? ""));
       const fullMessage: string = signRes?.fullMessage ?? message;
 
-      // 3) Upload to Shelby (via edge function - bytes are stored, BlobID anchored)
+      // 3) Upload to Shelby (edge function).
       setStage("uploading");
       const fd = new FormData();
       fd.append("file", file);
       fd.append("signature", signature);
       fd.append("public_key", publicKey);
       fd.append("message", fullMessage);
+      fd.append("fee_tx_hash", feeTxHash);
+      fd.append("fee_amount", String(UPLOAD_FEE_SHELBY_USDT));
+      fd.append("fee_asset", "ShelbyUSDT");
+      fd.append("fee_signature", feeSignature);
+      fd.append("fee_message", feeMessage);
+      fd.append("fee_status", feeStatus);
+
 
       const xhr = new XMLHttpRequest();
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attest-upload`;
