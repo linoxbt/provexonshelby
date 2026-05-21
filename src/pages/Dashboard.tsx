@@ -11,9 +11,32 @@ import { ConnectWallet } from "@/components/provex/ConnectWallet";
 import { useAptosNetwork, REQUIRED_NETWORK } from "@/hooks/useAptosNetwork";
 import { Button as UIButton } from "@/components/ui/button";
 
-type Stage = "idle" | "fee" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
+type Stage = "idle" | "fee" | "fee-confirming" | "hashing" | "signing" | "uploading" | "anchoring" | "done" | "error";
 
 const UPLOAD_FEE_SHELBY_USDT = 0.1;
+// 0.1 ShelbyUSDT settles on-chain as 0.1 APT (10_000_000 octas) on Aptos Testnet.
+// Mainnet uses the same flow but the network guard blocks it until mainnet is enabled.
+const FEE_OCTAS = 10_000_000;
+const FEE_RECIPIENT =
+  (import.meta.env.VITE_PROVEX_FEE_RECIPIENT as string | undefined) || "0x1";
+const APTOS_NODE = "https://fullnode.testnet.aptoslabs.com/v1";
+export const explorerTxUrl = (hash: string) =>
+  `https://explorer.aptoslabs.com/txn/${hash}?network=testnet`;
+
+async function waitForTx(hash: string, timeoutMs = 30_000): Promise<{ success: boolean; vm_status?: string }> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`${APTOS_NODE}/transactions/by_hash/${hash}`);
+      if (res.status === 200) {
+        const j = await res.json();
+        if (j.type === "user_transaction") return { success: !!j.success, vm_status: j.vm_status };
+      }
+    } catch {}
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  return { success: false, vm_status: "timeout" };
+}
 
 const Stat = ({ label, value, icon: Icon, sub }: { label: string; value: string; icon: any; sub?: string }) => (
   <div className="glass rounded-2xl p-6">
