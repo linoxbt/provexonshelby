@@ -80,6 +80,13 @@ Deno.serve(async (req) => {
         message,
         status,
         unverified_reason: reason,
+        fee_tx_hash: feeTxHash || null,
+        fee_amount: feeAmount,
+        fee_asset: feeAsset,
+        fee_signature: feeSignature || null,
+        fee_message: feeMessage || null,
+        fee_status: feeStatus,
+        aptos_tx_hash: feeTxHash || null,
       })
       .select()
       .single();
