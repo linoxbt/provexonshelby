@@ -330,8 +330,14 @@ const Dashboard = () => {
             {stage === "fee" && (
               <div className="py-6 flex flex-col items-center gap-3">
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                <div className="font-mono text-sm">Confirm {UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT upload fee...</div>
-                <div className="text-xs text-muted-foreground">Approve the fee in your wallet to continue</div>
+                <div className="font-mono text-sm">Approve {UPLOAD_FEE_SHELBY_USDT} ShelbyUSDT transfer...</div>
+                <div className="text-xs text-muted-foreground">Sign the on-chain payment in your wallet</div>
+              </div>
+            )}
+            {stage === "fee-confirming" && (
+              <div className="py-6 flex flex-col items-center gap-3">
+                <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                <div className="font-mono text-sm">Waiting for fee transaction to settle on Aptos...</div>
               </div>
             )}
             {stage === "signing" && (
