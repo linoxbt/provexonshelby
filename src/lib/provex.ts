@@ -44,6 +44,12 @@ export type Attestation = {
   status: "pending" | "verified" | "unverified";
   unverified_reason: string | null;
   created_at: string;
+  fee_tx_hash: string | null;
+  fee_amount: number | null;
+  fee_asset: string | null;
+  fee_signature: string | null;
+  fee_message: string | null;
+  fee_status: string | null;
 };
 
 export const downloadBlob = async (storagePath: string, fileName: string) => {
