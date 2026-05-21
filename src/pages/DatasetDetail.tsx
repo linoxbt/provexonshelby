@@ -131,10 +131,16 @@ const DatasetDetail = () => {
               <Link to={`/explorer/${dataset.blob_id}`}><GitBranch className="h-4 w-4 mr-1.5" /> Lineage</Link>
             </Button>
             <Button
-              onClick={() => downloadBlob(dataset.storage_path, dataset.file_name)}
+              onClick={streamDownload}
+              disabled={dlState === "downloading" || dlState === "verifying"}
               className="bg-gradient-primary text-primary-foreground shadow-glow"
             >
-              <Download className="h-4 w-4 mr-1.5" /> Download
+              {dlState === "downloading" || dlState === "verifying"
+                ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                : <Download className="h-4 w-4 mr-1.5" />}
+              {dlState === "downloading" ? `Downloading ${dlProgress}%`
+                : dlState === "verifying" ? "Verifying..."
+                : "Download"}
             </Button>
           </div>
         </div>
